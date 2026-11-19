@@ -54,3 +54,7 @@ desktop.ini
 # Test Coverage
 coverage/
 .nyc_output/
+
+# Ignore environment overrides anywhere in the monorepo
+**/.env.*
+!**/.env.example

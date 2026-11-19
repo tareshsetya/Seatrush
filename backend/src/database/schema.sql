@@ -72,3 +72,11 @@ CREATE TABLE IF NOT EXISTS booking_seats (
 );
 CREATE INDEX IF NOT EXISTS idx_booking_seats_seat ON booking_seats(seat_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(user_id, created_at DESC);
+
+-- App accounts are separate from demo seed users. Only hashes are stored.
+CREATE TABLE IF NOT EXISTS users (
+ id UUID PRIMARY KEY, name VARCHAR(80) NOT NULL, email VARCHAR(254) NOT NULL UNIQUE,
+ password_hash TEXT NOT NULL, role VARCHAR(16) NOT NULL DEFAULT 'CUSTOMER' CHECK (role IN ('CUSTOMER','ADMIN')),
+ token_version INTEGER NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);

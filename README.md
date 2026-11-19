@@ -1,42 +1,84 @@
-# SeatRush — PostgreSQL-backed ticket booking DEMO
+# SeatRush — Event discovery + real-time demo bookings
 
-A React + TypeScript, Node/Express and PostgreSQL portfolio project exploring concurrent seat holds and idempotent demo bookings. The main demo UI and event pages are retained from the original SeatRush repository.
+SeatRush is a React/TypeScript and Node/Express project with two **deliberately separate** flows:
 
-**Start here: [SETUP_WINDOWS.md](SETUP_WINDOWS.md)** (Docker Desktop, PostgreSQL, Redis, BullMQ, Socket.IO) and [DEPLOYMENT_VERCEL.md](DEPLOYMENT_VERCEL.md) (Vercel frontend + hosted backend).
+1. **Discover real listings** using Ticketmaster Discovery API and TMDB. Live provider data requires your own API keys. External listings open the provider's site; **SeatRush cannot book their inventory.** TMDB supplies film details, **not live theatre showtimes or seats**.
+2. **Try demo bookings** on the seeded SeatRush event inventory. PostgreSQL transactions hold and confirm demo seats; Redis/BullMQ handle background cleanup; Socket.IO updates the seat map.
 
-## Current working design
+The demo checkout **does not process payment**. Tickets are demo receipts and are not valid for entry to real events.
 
-- Backend **requires PostgreSQL** at startup and seeds 9 fictional events (96 seats each) without wiping existing bookings.
-- Seat holds use `SELECT ... FOR UPDATE` on sorted seat IDs inside a transaction. Expiration deadlines are recorded in the database; all availability and booking checks enforce those deadlines with the database clock.
-- Booking creation locks each requested seat, verifies hold ownership, computes the 8% **demo** fee server-side, and saves the booking plus seat assignments atomically.
-- The idempotency key is serialized with `pg_advisory_xact_lock` and backed by a unique database column and request fingerprint. Identical retries return the committed booking; different details with a reused key are rejected.
-- Redis and BullMQ optionally schedule delayed cleanup; a periodic PostgreSQL sweep maintains safety if jobs are delayed or Redis is down.
-- Socket.IO emits `SEATS_UPDATED` to event rooms on holds, releases, bookings and expiration. Socket fan-out is single-instance only.
-- Admin destructive/benchmark routes work in local development only (`ENABLE_DEMO_ADMIN_TOOLS=true`), not when `NODE_ENV=production`.
-- The frontend labels checkout as a demo and marks ticket references as **not valid for admission**. Stripe webhook route verifies signatures if credentials are configured but does not issue tickets: real payment orchestration is unfinished.
+## Start locally (Windows / PowerShell)
 
-## Quick start (PowerShell)
+Requirements: Node.js 20+, Docker Desktop with WSL 2, and npm.
 
 ```powershell
-# Project root
- docker compose up -d
-# Terminal 1
+# From the SeatRush project root:
+docker compose up -d
 cd backend
-Copy-Item .env.example .env
+Copy-Item .env.example .env     # only if you don't already have backend/.env
 npm ci
 npm run dev
-# Terminal 2 (from project root)
+```
+
+In a second terminal:
+
+```powershell
 cd frontend
 npm ci
 npm run dev
 ```
 
-Open http://localhost:5173. Backend health endpoint: http://localhost:4000/api/health.
+Open http://localhost:5173. The backend listens at http://localhost:4000.
 
-To test with PostgreSQL running: `cd backend; npm test`.
+If you have an **existing** `backend/.env`, keep it and add:
 
-## Technical honesty / known gaps
+```text
+JWT_SECRET=<at least 32 cryptographically random characters>
+TICKETMASTER_API_KEY=<your own API key; optional>
+TMDB_API_KEY=<your own API key; optional>
+```
 
-This is **not a deploy-and-sell-tickets production platform**. Login and user ID are demo-only and spoofable; real Stripe payment confirmation, payment/seat conflict recovery, QR validation, email sending, strong authorization, durable queue outbox, distributed socket adapter, waiting-room enforcement and external load testing are not complete. Do not store real private customer data.
+You can generate a JWT secret in PowerShell using Node:
 
-The system intentionally has no in-memory booking fallback. Correctness beats a demo that appears to run while silently losing seats after a restart. The old unused in-memory demo data generator remains only to build seed fixtures.
+```powershell
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+
+`backend/.env` is Git-ignored. Never commit private keys or passwords. The example `JWT_SECRET` is for **local development only**; replace it before deployment.
+
+## What changed in this revision
+
+- New editorial, light, responsive SeatRush UI (Tailwind + Lucide icons, custom styling) with city picker on first visit, city search, supported cities and browser location permission.
+- Real accounts in PostgreSQL: registration/sign-in, scrypt password hashing, signed eight-hour HS256 JWT cookies, server-side authentication/role checks, logout invalidation, basic rate limiting and origin checks.
+- Seat hold and booking routes no longer accept trusted user identity from JSON. History can only be read by its owner or an administrator.
+- Ticketmaster event discovery and TMDB film listings via the Express API, with five-minute Redis caching. Providers are optional and require API keys.
+- A redesigned seat plan, demo checkout, ticket receipt and account booking history.
+- Demo admin metrics now require an `ADMIN` role.
+
+## API credentials
+
+Register for a Ticketmaster key: https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/
+
+Register for a TMDB key: https://developer.themoviedb.org/docs/authentication-application
+
+Add credentials to `backend/.env` and restart the backend. The browser receives *normalized event summaries*, never your API keys.
+
+No provider data is invented when a key is missing. Coverage varies by city; Ticketmaster listings in India may be sparse. TMDB movie listings are country-wide even when you choose a city.
+
+## Important limitations / before production
+
+This is an improved **development demo**, not a production-certified ticket seller. Before using real customer data or collecting money, add email verification and password reset, stronger distributed account-abuse detection, a payment-intent/webhook/refund workflow, reliable email delivery, signed scannable QR verification, database migrations/backups, monitoring, real concurrency/crash tests, privacy/legal review, and a worker deployment strategy.
+
+The Node application includes BullMQ workers **in the backend process**; a worker-only deployment/refactor is advisable at scale. With multiple API instances, configure the Socket.IO Redis adapter or another cross-instance event fanout mechanism. The built-in rate limiter is not sufficient for hostile internet traffic.
+
+### Running tests
+
+```powershell
+cd backend
+npm test
+npm run build
+cd ../frontend
+npm run build
+```
+
+The concurrency tests need PostgreSQL running. The crypto tests validate password hashing and JWT signatures without a database. Verify them locally before deployment. See `VALIDATION_REPORT.md` for what was and wasn't checked while preparing this ZIP.

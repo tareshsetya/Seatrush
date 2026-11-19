@@ -1,69 +1,45 @@
-# SeatRush deployment guide: Vercel frontend + hosted Express backend
+# Deployment: Vercel React frontend + hosted Node backend
 
-## Recommended first deployment
+Recommended: **Vercel for `frontend/`**, Railway/Render/Fly for the persistent **Express + Socket.IO API**, and hosted PostgreSQL + Redis. The current code runs BullMQ in the API process; for reliability at scale split it into an independently supervised worker.
 
-Deploy the **React frontend on Vercel** and **the Node/Express API on Render** (or Railway/Fly.io). Use a managed PostgreSQL instance; add managed Redis if you want BullMQ background jobs. This is one API instance, not a distributed high-availability system.
-
-As of October 20, 2026, **Vercel Functions support WebSocket connections**, including Socket.IO. You can eventually move your backend onto Vercel, but the provided backend expects a persistent `http.Server`, a 15-second sweeper, and in-process BullMQ workers. It cannot simply be pointed at Vercel Functions without refactoring lifecycle/background jobs and cross-instance socket broadcasts. The simpler deployed arrangement is Vercel UI + always-running Node API.
-
-Vercel announcement: https://vercel.com/changelog/websocket-support-is-now-generally-available
-Vite guide: https://vercel.com/docs/frameworks/frontend/vite
-
-## Step 1 — Host PostgreSQL and Redis
-
-Obtain a PostgreSQL connection string from any supported managed PostgreSQL host. Store it as `DATABASE_URL` on the API host; **never** as a `VITE_` variable. Optionally obtain managed Redis TCP URL as `REDIS_URL`. The application **will not start** if PostgreSQL is unavailable. Redis is optional for correctness; when Redis is absent, a PostgreSQL expiry sweep still handles old holds.
-
-This demo runs DDL migrations on startup and seeds fictional events. For a serious deployment, use managed migrations and controlled seed commands instead of automatic production seeding.
-
-## Step 2 — Deploy backend on Render
-
-1. Push the full project to your GitHub repository.
-2. In Render, create a **Web Service** connected to that repository.
-3. Set **Root Directory**: `backend`.
-4. Set **Build Command**: `npm ci && npm run build`.
-5. Set **Start Command**: `npm start`.
-6. Set environment variables:
+## Backend environment variables
 
 ```text
 NODE_ENV=production
-DATABASE_URL=<managed PostgreSQL URL>
-REDIS_URL=<optional managed Redis URL>
-FRONTEND_URL=https://your-seatrush.vercel.app
-HOLD_DURATION_SECONDS=600
+FRONTEND_URL=https://YOUR-FRONTEND.vercel.app
+DATABASE_URL=postgresql://...
+REDIS_URL=redis://...
+JWT_SECRET=<generate 48 random bytes or longer>
+AUTH_COOKIE_SAMESITE=none
 DEMO_CHECKOUT_ENABLED=true
 ENABLE_DEMO_ADMIN_TOOLS=false
+TICKETMASTER_API_KEY=<optional>
+TMDB_API_KEY=<optional>
 ```
 
-`DEMO_CHECKOUT_ENABLED=true` allows **pretend bookings only**. No actual money moves. For a private backend without public demonstration checkout, set it to `false`.
+Never put the values of `JWT_SECRET`, `TICKETMASTER_API_KEY`, `TMDB_API_KEY`, `DATABASE_URL` or `REDIS_URL` into Vercel `VITE_` variables. `VITE_` variables become public browser code.
 
-7. Verify `https://YOUR-BACKEND.onrender.com/api/health` returns PostgreSQL `CONNECTED`.
-8. For a public demo, avoid uploading personal information. There is no real login/authorization yet.
+Use HTTPS on both domains. `SameSite=None; Secure; HttpOnly` is required for the auth cookie if Vercel and API are on separate **cross-site** domains. Third-party cookie restrictions in some browsers may still prevent login on separate sites. The robust long-term arrangement is `app.yourdomain.com` and `api.yourdomain.com` with a same-site cookie or an API reverse proxy on your app's domain.
 
-Render docs: https://render.com/docs/deploy-node-express-app
+For Render: root directory `backend`, build `npm ci && npm run build`, start `npm start`. Run the database using a managed PostgreSQL connection string (do not expose port 5432 publicly). The backend calls schema DDL and seeds demo events at startup; move those tasks into explicit migrations/seed commands before a serious production deployment.
 
-## Step 3 — Deploy frontend on Vercel
+## Vercel frontend
 
-1. New Project → Import your GitHub repository.
-2. Set **Root Directory** to `frontend` (important for this monorepo).
-3. Framework Preset: Vite. Build command: `npm run build`; Output directory: `dist`.
-4. Set the following **Vercel project environment variables**, using your API URL (no `/api`, no trailing slash):
+Import your existing SeatRush GitHub repository. Set **Root Directory** to `frontend`, framework `Vite`, build `npm run build`, output `dist`. Set:
 
 ```text
-VITE_API_URL=https://YOUR-BACKEND.onrender.com
-VITE_SOCKET_URL=https://YOUR-BACKEND.onrender.com
+VITE_API_URL=https://YOUR-BACKEND.example.com
+VITE_SOCKET_URL=https://YOUR-BACKEND.example.com
 ```
 
-5. Deploy. The included `frontend/vercel.json` supports client-side routes if added later.
-6. Update backend `FRONTEND_URL` to the real Vercel frontend origin. Redeploy the backend.
-7. Confirm browser Network tab: REST requests use `https://YOUR-BACKEND.onrender.com/api/...` and Socket.IO connects to the backend origin.
+After deploying, set `FRONTEND_URL` on the backend to the exact Vercel URL (or a comma-separated list of allowed preview origins, if needed). Verify GET `/api/health`, registration, session cookie, booking ownership, and Socket.IO on the deployed sites.
 
-## Before claiming production readiness
+## Payment / security limitations
 
-- Implement proper accounts, password hashing, authenticated sessions, and ownership checks (browser-local `userId` is NOT authentication).
-- Complete Stripe test PaymentIntents + signed, durable, idempotent webhook fulfillment. Handle late successful payments, expired holds, recovery and refunds. Do not trust client-side “paid” signals.
-- Use a robust booking/payment state machine and transactional outbox for cross-service events.
-- Implement ticket signature/real QR validation, and a verified email delivery provider.
-- Add distributed Socket.IO adapter for >1 backend instance, consistent rate limiting and queue admission, database migrations, secrets, monitoring, and tested recovery scenarios.
-- Load-test externally using k6 and test multi-instance failures; an in-process benchmark isn't a production guarantee.
+The checkout currently deliberately issues **demo bookings without payment**. Stripe webhook verification exists, but no real payment-intent checkout or ticket fulfillment integration is implemented. Do not claim real ticket sales, verified payments, guaranteed load capacity, or production readiness until these have been built and tested.
 
-This project ships with an intentionally **single-instance** backend setup. Redis may be used for BullMQ, but it is NOT the authoritative owner of a seat.
+## Helpful docs
+
+- Vercel Vite: https://vercel.com/docs/frameworks/frontend/vite
+- Ticketmaster Discovery: https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/
+- TMDB: https://developer.themoviedb.org/docs/authentication-application

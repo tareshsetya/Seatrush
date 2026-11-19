@@ -1,6 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { adminController } from './admin.controller.js';
+import {requireAuth,requireAdmin} from '../auth/auth.middleware.js';
 const router=Router();
+router.use(requireAuth,requireAdmin);
 const demoOnly=(_req:Request,res:Response,next:NextFunction)=>{
   if(process.env.NODE_ENV==='production'||process.env.ENABLE_DEMO_ADMIN_TOOLS!=='true'){
     res.status(403).json({success:false,message:'Unsafe demo admin operations are disabled on this server.'});return;

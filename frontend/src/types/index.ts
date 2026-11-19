@@ -72,11 +72,8 @@ export interface UserProfile {
   id: string;
   name: string;
   email: string;
-  avatarUrl: string;
-  phone?: string;
-  memberTier: 'District Member' | 'District Gold' | 'District VIP';
+  role: 'CUSTOMER' | 'ADMIN';
   joinedDate: string;
-  loyaltyPoints: number;
 }
 
 export interface ConcurrencyMetrics {
@@ -93,3 +90,6 @@ export interface SocketSeatUpdatePayload {
   updatedSeats: Seat[];
   reason: 'HELD' | 'RELEASED' | 'BOOKED' | 'EXPIRED';
 }
+
+export interface DiscoveryItem {id:string;source:'ticketmaster'|'tmdb';kind:'event'|'movie';title:string;subtitle:string;image:string;date:string;venue:string;city:string;url:string;category:string;}
+export interface DiscoveryMeta {city:string;providers:{ticketmaster:boolean;tmdb:boolean};warnings:string[];notice:string;}

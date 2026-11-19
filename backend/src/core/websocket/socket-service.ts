@@ -25,11 +25,11 @@ export class SocketService {
     this.io.on('connection', (socket: Socket) => {
       // User joins specific event room to receive live seat updates
       socket.on('join_event', (eventId: string) => {
-        socket.join(`event:${eventId}`);
+        if(typeof eventId==='string' && /^[a-zA-Z0-9_-]{1,64}$/.test(eventId))socket.join(`event:${eventId}`);
       });
 
       socket.on('leave_event', (eventId: string) => {
-        socket.leave(`event:${eventId}`);
+        if(typeof eventId==='string' && /^[a-zA-Z0-9_-]{1,64}$/.test(eventId))socket.leave(`event:${eventId}`);
       });
 
       socket.on('disconnect', () => {
@@ -49,7 +49,7 @@ export class SocketService {
 
     const payload: SocketSeatUpdatePayload = {
       eventId,
-      updatedSeats,
+      updatedSeats: updatedSeats.map(seat => ({...seat,heldBy:undefined,bookedBy:undefined})),
       reason,
     };
 

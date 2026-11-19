@@ -1,28 +1,27 @@
-# SeatRush validation report (2026-11-18)
+# SeatRush — validation summary
 
-## Completed offline static checks
+## Checks performed for this revised ZIP
 
-- Reviewed and rewired the core seat holding and booking services to use PostgreSQL instead of an in-memory mirror.
-- Inspected `backend` and `frontend` TypeScript/TSX files using the TypeScript syntax parser: no syntax parse errors.
-- Checked relative TypeScript imports for missing targets: none found.
-- Preserved original npm package-lock files because no third-party packages were added.
-- Configured local dependency services and Vite-to-API frontend routing.
+- Parsed all TypeScript and TSX source files using TypeScript's parser: no syntax errors at time of packaging.
+- Checked relative TypeScript imports and environment file references.
+- Confirmed legacy third-party branding is absent from project source.
+- Ran isolated Node.js smoke tests for scrypt hash/verification and signed JWT validation/tampering.
+- Inspected login/hold/bookings controllers: user identity is now derived from JWT cookie middleware, not browser-supplied `userId`.
+- Confirmed external event URLs open providers instead of being passed into SeatRush booking routes.
 
-## NOT run in this environment
+## Not verified here
 
-- `npm ci` could not complete (package registry unreachable/time-limited in this environment).
-- Full TypeScript type checking and production builds require installing the existing npm dependencies.
-- Actual PostgreSQL integration tests cannot run here because Docker, PostgreSQL, and Redis executables are unavailable.
-- Browser tests, Redis/BullMQ worker tests, Stripe test events, multi-server Socket.IO tests, and cloud deployment are not performed.
+- `npm ci`, `npm run build`, `npm test` and actual Docker/PostgreSQL/Redis end-to-end tests were **not completed in this execution environment**, where npm registry downloads were unavailable and PostgreSQL wasn't running.
+- The connected Ticketmaster and TMDB APIs could not be exercised without the user's API keys.
+- Browser pixel-by-pixel screenshot review and accessibility audits were not completed.
 
-## Run these locally before publishing the project as tested
+## Required local checks before deploying
 
-1. `docker compose up -d` from the project root.
-2. Copy `backend/.env.example` to `backend/.env`.
-3. `cd backend && npm ci && npm run build && npm test`.
-4. `cd frontend && npm ci && npm run build`.
-5. Start the backend and frontend and manually test seat holds, expiration, booking retries and refresh/reconnect behavior.
-6. Confirm that production `NODE_ENV=production` disables the destructive admin routes.
-7. Only then deploy the frontend and API following `DEPLOYMENT_VERCEL.md`.
+1. `docker compose up -d`, then run backend and frontend `npm ci` / `npm run build`.
+2. Register with a new email; log out; verify login rejects wrong password and sessions expire/revoke.
+3. Open same event in two browsers/accounts; verify one hold prevents the other booking.
+4. Verify a user cannot request another account's booking history using the API.
+5. Add provider API keys and verify results, attribution, empty states, rate limits, and links for selected cities.
+6. Run the backend tests and k6 against a *nonproduction* test database; review failures before making reliability claims.
 
-Do not claim the repository passed integration tests based on this report. It has only undergone static validation in this environment.
+**This is not a certification of production readiness.**

@@ -108,3 +108,25 @@ docker compose up -d
 ## IMPORTANT: Current safety limitations
 
 This is a **portfolio demo**, not a checkout system that can take money. Login is a browser-local mock and `userId` is client-controlled. There is NO real payment, user authentication, QR validation, real email delivery, distributed rate limiting, or distributed Socket.IO adapter. The in-process waiting room is not production admission control. **Do not use real customer data or sell real tickets.**
+
+---
+
+## November 2026 revision: authentication and live discovery
+
+This ZIP replaces the previous localStorage mock login with PostgreSQL-backed account registration and JWT cookie sessions. Your existing `backend/.env` is **not** included in the ZIP; preserve it when upgrading, then add these new variables:
+
+```text
+JWT_SECRET=<32+ random characters generated locally>
+TICKETMASTER_API_KEY=<optional, your developer API key>
+TMDB_API_KEY=<optional, your developer API key>
+```
+
+Generate a strong JWT secret in PowerShell:
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+
+After updating `.env`, **restart** your running backend (`Ctrl+C`, then `npm run dev`) so the new variables are loaded. Backend startup adds the `users` table to your existing PostgreSQL database without deleting existing SeatRush events or bookings. You can register a fresh account in the redesigned UI. External listings will remain empty until their API keys are set.
+
+**On an existing repo:** extract this ZIP directly into `T:\a projects\SeatRush`, replacing project files. There is no `SeatRush-main` wrapper directory in the delivered ZIP. Do not overwrite your existing `.env` or Docker database volume. Before copying files, `git status` and commit or back up your local work. Then run `npm ci` in both `backend` and `frontend` and verify the builds.

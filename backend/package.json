@@ -7,7 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test": "tsx --test tests/concurrency.test.ts"
+    "test": "tsx --test tests/concurrency.test.ts tests/auth.crypto.test.ts"
   },
   "dependencies": {
     "@types/pg": "^8.23.1",

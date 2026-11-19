@@ -17,8 +17,14 @@ import bookingRoutes from './modules/bookings/booking.routes.js';
 import adminRoutes from './modules/admin/admin.routes.js';
 import paymentRoutes from './modules/payments/stripe.routes.js';
 import waitingRoomRoutes from './core/waiting-room/waiting-room.routes.js';
+import authRoutes from './modules/auth/auth.routes.js';
+import discoveryRoutes from './modules/discovery/discovery.routes.js';
+import { optionalAuth } from './modules/auth/auth.middleware.js';
+import {checkJwtSetup} from './modules/auth/auth.crypto.js';
+import {originGuard} from './middleware/origin-guard.js';
 
 const app=express();
+if(process.env.NODE_ENV==='production')app.set('trust proxy',1);
 const server=http.createServer(app);
 const origins=[...config.frontendUrl.split(',').map(s=>s.trim()),'http://localhost:5173','http://127.0.0.1:5173'];
 SocketService.getInstance().init(server,config.frontendUrl);
@@ -27,6 +33,8 @@ app.use(cors({origin:origins,credentials:true}));
 app.use('/api/payments/webhook',express.raw({type:'application/json'}));
 app.use(express.json({limit:'32kb'}));
 app.use(requestLogger);
+app.use(originGuard);
+app.use(optionalAuth);
 app.use('/api',rateLimiter);
 app.get('/api/health',async(_req,res)=>{
   try{
@@ -37,6 +45,8 @@ app.get('/api/health',async(_req,res)=>{
         bullmq:queueManager.getIsBullMQActive()?'RUNNING':'DISABLED'},holdDurationSeconds:config.holdDurationSeconds});
   }catch{res.status(503).json({status:'unhealthy',postgres:'OFFLINE'});}
 });
+app.use('/api/auth',authRoutes);
+app.use('/api/discover',discoveryRoutes);
 app.use('/api/events',eventRoutes);
 app.use('/api/seats',seatRoutes);
 app.use('/api/bookings',bookingRoutes);
@@ -47,6 +57,7 @@ if (process.env.NODE_ENV !== 'production') app.use('/api/waiting-room',waitingRo
 app.use(errorHandler);
 
 async function main(){
+  checkJwtSetup();
   await postgresService.init(); // Fail CLOSED if PostgreSQL is missing.
   await seedPostgres();
   if(await redisService.init()) queueManager.init();
