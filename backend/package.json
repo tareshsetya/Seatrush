@@ -1,0 +1,33 @@
+{
+  "name": "seatrush-backend",
+  "version": "1.0.0",
+  "description": "SeatRush Backend API - High-concurrency ticket booking engine",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "tsx --test tests/concurrency.test.ts"
+  },
+  "dependencies": {
+    "@types/pg": "^8.23.1",
+    "bullmq": "^6.7.5",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "ioredis": "^6.0.0",
+    "pg": "^8.23.1",
+    "socket.io": "^4.8.1",
+    "stripe": "^23.1.0",
+    "uuid": "^11.1.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.9",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}
